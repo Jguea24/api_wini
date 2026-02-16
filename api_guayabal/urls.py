@@ -1,10 +1,13 @@
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import path
 from django.http import JsonResponse
 from rest_framework_simplejwt.views import TokenRefreshView
 
 
 from app.views import (
+    CategoryListView,
     LoginView,
     RegisterView,
     ProductListView,
@@ -31,6 +34,10 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view()),
 
     # Recursos
+    path('categories/', CategoryListView.as_view()),
     path('products/', ProductListView.as_view()),
     path('cart/', CartView.as_view()),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

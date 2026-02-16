@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Product, Cart, UserProfile
+from .models import Category, Product, Cart, UserProfile
 
 
 # =====================================================
@@ -146,13 +146,44 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 # =====================================================
+# SERIALIZER DE CATEGORIAS
+# =====================================================
+
+class CategorySerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'order', 'image', 'image_url']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return ''
+        request = self.context.get('request')
+        if request is None:
+            return obj.image.url
+        return request.build_absolute_uri(obj.image.url)
+
+
+# =====================================================
 # SERIALIZER DE PRODUCTOS
 # =====================================================
 
 class ProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = ['id', 'name', 'price', 'stock', 'image', 'image_url', 'category', 'category_name']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return ''
+        request = self.context.get('request')
+        if request is None:
+            return obj.image.url
+        return request.build_absolute_uri(obj.image.url)
 
 
 # =====================================================

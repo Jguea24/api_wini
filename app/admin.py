@@ -1,15 +1,43 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Product, Cart, UserProfile
+from django.utils.html import format_html
+from .models import Category, Product, Cart, UserProfile
 
 # Register your models here.
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'order', 'image_preview')
+    ordering = ('order', 'name')
+    search_fields = ('name',)
+    readonly_fields = ('image_preview',)
+
+    @admin.display(description='Imagen')
+    def image_preview(self, obj):
+        if not obj.image:
+            return '-'
+        return format_html(
+            '<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:6px;" />',
+            obj.image.url
+        )
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'stock')
-    search_fields = ('name',)
-    list_filter = ('price',)
+    list_display = ('name', 'category', 'price', 'stock', 'image_preview')
+    search_fields = ('name', 'category__name')
+    list_filter = ('category', 'price',)
+    readonly_fields = ('image_preview',)
+
+    @admin.display(description='Imagen')
+    def image_preview(self, obj):
+        if not obj.image:
+            return '-'
+        return format_html(
+            '<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:6px;" />',
+            obj.image.url
+        )
 
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
