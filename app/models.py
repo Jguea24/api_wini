@@ -16,6 +16,19 @@ class Category(models.Model):
         return self.name
 
 
+class Banner(models.Model):
+    title = models.CharField(max_length=120, blank=True)
+    image = models.ImageField(upload_to='banners/')
+    order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.title or f'Banner {self.id}'
+
+
 class Product(models.Model):
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=8, decimal_places=2)

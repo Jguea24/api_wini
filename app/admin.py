@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
-from .models import Category, Product, Cart, UserProfile
+from .models import Banner, Category, Product, Cart, UserProfile
 
 # Register your models here.
 
@@ -19,6 +19,24 @@ class CategoryAdmin(admin.ModelAdmin):
             return '-'
         return format_html(
             '<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:6px;" />',
+            obj.image.url
+        )
+
+
+@admin.register(Banner)
+class BannerAdmin(admin.ModelAdmin):
+    list_display = ('title', 'order', 'is_active', 'image_preview')
+    list_filter = ('is_active',)
+    ordering = ('order', 'id')
+    search_fields = ('title',)
+    readonly_fields = ('image_preview',)
+
+    @admin.display(description='Imagen')
+    def image_preview(self, obj):
+        if not obj.image:
+            return '-'
+        return format_html(
+            '<img src="{}" style="height:56px;width:120px;object-fit:cover;border-radius:8px;" />',
             obj.image.url
         )
 

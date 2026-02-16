@@ -7,8 +7,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.exceptions import ObjectDoesNotExist
 
-from .models import Category, Product, Cart
-from .serializers import CategorySerializer, ProductSerializer, CartSerializer, RegisterSerializer
+from .models import Banner, Category, Product, Cart
+from .serializers import BannerSerializer, CategorySerializer, ProductSerializer, CartSerializer, RegisterSerializer
 
 
 class RegisterView(generics.CreateAPIView):
@@ -103,6 +103,14 @@ class CategoryListView(generics.ListAPIView):
             'image_url': '',
         }] + list(response.data)
         return response
+
+
+class BannerListView(generics.ListAPIView):
+    serializer_class = BannerSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        return Banner.objects.filter(is_active=True).order_by('order', 'id')
 
 
 class CartView(generics.ListCreateAPIView):

@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 
 from app.views import (
+    BannerListView,
     CategoryListView,
     LoginView,
     RegisterView,
@@ -34,6 +35,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view()),
 
     # Recursos
+    path('banners/', BannerListView.as_view()),
     path('categories/', CategoryListView.as_view()),
     path('products/', ProductListView.as_view()),
     path('cart/', CartView.as_view()),
