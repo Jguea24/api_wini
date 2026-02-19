@@ -1,4 +1,6 @@
 from datetime import timedelta
+import os
+import sys
 
 from pathlib import Path
 
@@ -98,6 +100,15 @@ DATABASES = {
     }
 }
 
+# Evita requerir CREATEDB en PostgreSQL al correr tests locales.
+IS_TESTING = any(arg.startswith('test') for arg in sys.argv)
+USE_SQLITE_FOR_TESTS = os.getenv('USE_SQLITE_FOR_TESTS', '1').strip().lower() in {'1', 'true', 'yes'}
+if IS_TESTING and USE_SQLITE_FOR_TESTS:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -138,3 +149,18 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Google Maps/Places server key (use backend-only key restricted by IP).
+GOOGLE_MAPS_SERVER_API_KEY = os.getenv('GOOGLE_MAPS_SERVER_API_KEY', '')
+GOOGLE_MAPS_LANGUAGE = os.getenv('GOOGLE_MAPS_LANGUAGE', 'es')
+GOOGLE_MAPS_REGION = os.getenv('GOOGLE_MAPS_REGION', 'ec')
+
+# Geo provider:
+# - "osm": OpenStreetMap stack (Nominatim + OSRM) [default]
+# - "google": Google stack (Places/Geocoding/Routes/Address Validation)
+GEO_PROVIDER = os.getenv('GEO_PROVIDER', 'osm').strip().lower()
+
+# OpenStreetMap / OSRM settings
+GEOCODER_USER_AGENT = os.getenv('GEOCODER_USER_AGENT', 'api-guayabal/1.0 (mobile-app)')
+OSM_NOMINATIM_BASE_URL = os.getenv('OSM_NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')
+OSM_ROUTER_BASE_URL = os.getenv('OSM_ROUTER_BASE_URL', 'https://router.project-osrm.org')

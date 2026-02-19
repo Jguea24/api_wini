@@ -1,6 +1,18 @@
 from rest_framework import serializers
-from django.contrib.auth.models import User
-from .models import Banner, Category, Product, Cart, UserProfile, DeliveryAddress, RoleChangeRequest
+from django.contrib.auth.models import Group, User
+from .models import (
+    Banner,
+    Category,
+    Product,
+    Cart,
+    UserProfile,
+    DeliveryAddress,
+    RoleChangeRequest,
+    Order,
+    OrderItem,
+    Shipment,
+    ShipmentLocation,
+)
 
 
 # =====================================================
@@ -12,12 +24,24 @@ class RegisterSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(write_only=True, required=False, allow_blank=True)
     address = serializers.CharField(write_only=True, required=False, allow_blank=True)
     username = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    role_reason = serializers.CharField(write_only=True, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ['full_name', 'email', 'phone', 'address', 'username', 'password', 'password2']
+        fields = [
+            'full_name',
+            'email',
+            'phone',
+            'address',
+            'username',
+            'role',
+            'role_reason',
+            'password',
+            'password2',
+        ]
         extra_kwargs = {
             'email': {'required': True},
             'username': {'required': False},
@@ -70,6 +94,22 @@ class RegisterSerializer(serializers.ModelSerializer):
                 or ''
             )
 
+        if 'role' not in raw_data:
+            raw_data['role'] = (
+                data.get('role')
+                or data.get('requested_role')
+                or data.get('user_role')
+                or ''
+            )
+
+        if 'role_reason' not in raw_data:
+            raw_data['role_reason'] = (
+                data.get('role_reason')
+                or data.get('reason')
+                or data.get('motivo')
+                or ''
+            )
+
         return super().to_internal_value(raw_data)
 
     def validate(self, attrs):
@@ -78,6 +118,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         email = (attrs.get('email') or '').strip().lower()
         username = (attrs.get('username') or '').strip()
         phone = (attrs.get('phone') or '').strip()
+        role = (attrs.get('role') or '').strip().lower()
 
         if not password:
             raise serializers.ValidationError({'password': 'Este campo es obligatorio.'})
@@ -112,14 +153,32 @@ class RegisterSerializer(serializers.ModelSerializer):
         elif User.objects.filter(username=username).exists():
             raise serializers.ValidationError({'username': 'Este usuario ya existe.'})
 
+        role_map = {
+            'cliente': 'client',
+            'client': 'client',
+            'customer': 'client',
+            'usuario': 'client',
+            'user': 'client',
+            'repartidor': 'driver',
+            'driver': 'driver',
+            'proveedor': 'provider',
+            'provider': 'provider',
+        }
+        normalized_role = role_map.get(role, role)
+        if normalized_role and normalized_role not in {'client', 'driver', 'provider'}:
+            raise serializers.ValidationError({'role': 'Rol invalido. Usa client, driver o provider.'})
+
         attrs['email'] = email
         attrs['phone'] = phone
+        attrs['role'] = normalized_role
         return attrs
 
     def create(self, validated_data):
         full_name = (validated_data.pop('full_name', '') or '').strip()
         phone = (validated_data.pop('phone', '') or '').strip()
         address = (validated_data.pop('address', '') or '').strip()
+        requested_role = validated_data.pop('role', '')
+        role_reason = (validated_data.pop('role_reason', '') or '').strip()
         validated_data.pop('password2', None)
 
         password = validated_data.pop('password')
@@ -141,6 +200,19 @@ class RegisterSerializer(serializers.ModelSerializer):
                 'address': address,
             }
         )
+
+        # Rol base para todas las cuentas.
+        cliente_group, _ = Group.objects.get_or_create(name='CLIENTE')
+        user.groups.add(cliente_group)
+
+        # Para roles operativos, crea solicitud pendiente en registro.
+        if requested_role in {'driver', 'provider'}:
+            RoleChangeRequest.objects.create(
+                user=user,
+                requested_role=requested_role,
+                reason=role_reason or 'Solicitud creada durante el registro.',
+                status='pending',
+            )
 
         return user
 
@@ -283,6 +355,220 @@ class CartSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(obj.product.image.url)
 
 
+class OrderItemSerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(read_only=True)
+    product_image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = [
+            'id',
+            'product',
+            'product_name',
+            'product_price',
+            'quantity',
+            'subtotal',
+            'product_image_url',
+        ]
+        read_only_fields = fields
+
+    def get_product_image_url(self, obj):
+        if not obj.product or not obj.product.image:
+            return ''
+        request = self.context.get('request')
+        if request is None:
+            return obj.product.image.url
+        return request.build_absolute_uri(obj.product.image.url)
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    items = OrderItemSerializer(many=True, read_only=True)
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'user',
+            'delivery_address',
+            'delivery_main_address',
+            'delivery_secondary_street',
+            'delivery_apartment',
+            'delivery_city',
+            'delivery_instructions',
+            'status',
+            'status_label',
+            'total_amount',
+            'total_items',
+            'created_at',
+            'updated_at',
+            'items',
+        ]
+        read_only_fields = fields
+
+
+class OrderCreateSerializer(serializers.Serializer):
+    delivery_address = serializers.PrimaryKeyRelatedField(
+        queryset=DeliveryAddress.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    def to_internal_value(self, data):
+        raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'delivery_address' not in raw_data:
+            raw_data['delivery_address'] = (
+                data.get('delivery_address')
+                or data.get('address_id')
+                or data.get('address')
+                or data.get('direccion_id')
+            )
+        return super().to_internal_value(raw_data)
+
+
+class ShipmentLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShipmentLocation
+        fields = ['id', 'latitude', 'longitude', 'heading', 'speed', 'recorded_at']
+        read_only_fields = fields
+
+
+class ShipmentSerializer(serializers.ModelSerializer):
+    order = serializers.PrimaryKeyRelatedField(read_only=True)
+    driver = serializers.PrimaryKeyRelatedField(read_only=True)
+    driver_name = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    locations = serializers.SerializerMethodField()
+    has_live_location = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Shipment
+        fields = [
+            'id',
+            'order',
+            'driver',
+            'driver_name',
+            'status',
+            'status_label',
+            'current_latitude',
+            'current_longitude',
+            'current_heading',
+            'current_speed',
+            'last_location_at',
+            'eta_minutes',
+            'notes',
+            'created_at',
+            'updated_at',
+            'has_live_location',
+            'locations',
+        ]
+        read_only_fields = fields
+
+    def get_driver_name(self, obj):
+        if not obj.driver:
+            return ''
+        full_name = f'{obj.driver.first_name} {obj.driver.last_name}'.strip()
+        return full_name or obj.driver.username
+
+    def get_has_live_location(self, obj):
+        return obj.current_latitude is not None and obj.current_longitude is not None
+
+    def get_locations(self, obj):
+        request = self.context.get('request')
+        try:
+            raw_limit = request.query_params.get('points', 60) if request else 60
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            limit = 60
+        limit = max(1, min(limit, 300))
+        qs = obj.locations.all().order_by('-recorded_at', '-id')[:limit]
+        return ShipmentLocationSerializer(qs, many=True).data
+
+
+class ShipmentLocationUpdateSerializer(serializers.Serializer):
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
+    heading = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True)
+    speed = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True)
+    status = serializers.ChoiceField(choices=Shipment.STATUS_CHOICES, required=False)
+    eta_minutes = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    notes = serializers.CharField(required=False, allow_blank=True, max_length=255)
+
+    def to_internal_value(self, data):
+        raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        if 'latitude' not in raw_data:
+            raw_data['latitude'] = data.get('lat') or data.get('current_latitude')
+
+        if 'longitude' not in raw_data:
+            raw_data['longitude'] = data.get('lng') or data.get('lon') or data.get('current_longitude')
+
+        if 'eta_minutes' not in raw_data:
+            raw_data['eta_minutes'] = (
+                data.get('eta_minutes')
+                or data.get('eta')
+                or data.get('eta_min')
+            )
+
+        return super().to_internal_value(raw_data)
+
+    def validate_latitude(self, value):
+        if value < -90 or value > 90:
+            raise serializers.ValidationError('latitude debe estar entre -90 y 90.')
+        return value
+
+    def validate_longitude(self, value):
+        if value < -180 or value > 180:
+            raise serializers.ValidationError('longitude debe estar entre -180 y 180.')
+        return value
+
+
+class ShipmentAssignDriverSerializer(serializers.Serializer):
+    driver_id = serializers.IntegerField(required=False, allow_null=True)
+    auto_assign = serializers.BooleanField(required=False)
+
+    def to_internal_value(self, data):
+        raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
+
+        if 'driver_id' not in raw_data:
+            raw_data['driver_id'] = (
+                data.get('driver_id')
+                or data.get('driver')
+                or data.get('repartidor_id')
+            )
+
+        if 'auto_assign' not in raw_data:
+            raw_data['auto_assign'] = (
+                data.get('auto_assign')
+                if data.get('auto_assign') is not None
+                else data.get('autoAssign')
+            )
+
+        return super().to_internal_value(raw_data)
+
+    def validate_driver_id(self, value):
+        if value is None:
+            return None
+
+        exists = User.objects.filter(id=value, is_active=True).exists()
+        if not exists:
+            raise serializers.ValidationError('El repartidor no existe o esta inactivo.')
+
+        return value
+
+    def validate(self, attrs):
+        has_driver_id = 'driver_id' in attrs
+        auto_assign = attrs.get('auto_assign')
+
+        if has_driver_id and auto_assign:
+            raise serializers.ValidationError(
+                {'non_field_errors': 'No envies driver_id y auto_assign=true al mismo tiempo.'}
+            )
+
+        return attrs
+
+
 class DeliveryAddressSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(read_only=True)
 
@@ -373,11 +659,24 @@ class MeSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(required=False, allow_blank=True)
     phone = serializers.CharField(required=False, allow_blank=True)
     address = serializers.CharField(required=False, allow_blank=True)
+    role = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+    pending_role_request = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'full_name', 'phone', 'address']
-        read_only_fields = ['id', 'username']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'full_name',
+            'phone',
+            'address',
+            'role',
+            'roles',
+            'pending_role_request',
+        ]
+        read_only_fields = ['id', 'username', 'role', 'roles', 'pending_role_request']
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -385,6 +684,37 @@ class MeSerializer(serializers.ModelSerializer):
         data['phone'] = getattr(getattr(instance, 'profile', None), 'phone', '')
         data['address'] = getattr(getattr(instance, 'profile', None), 'address', '')
         return data
+
+    def _resolve_primary_role(self, roles):
+        role_set = set(roles)
+        if 'ADMIN' in role_set:
+            return 'admin'
+        if 'DRIVER' in role_set or 'REPARTIDOR' in role_set:
+            return 'driver'
+        if 'PROVIDER' in role_set:
+            return 'provider'
+        if 'CLIENTE' in role_set:
+            return 'client'
+        return 'user'
+
+    def get_roles(self, instance):
+        return sorted(list(instance.groups.values_list('name', flat=True)))
+
+    def get_role(self, instance):
+        roles = self.get_roles(instance)
+        return self._resolve_primary_role(roles)
+
+    def get_pending_role_request(self, instance):
+        pending = instance.role_change_requests.filter(status='pending').order_by('-id').first()
+        if not pending:
+            return None
+        return {
+            'id': pending.id,
+            'requested_role': pending.requested_role,
+            'status': pending.status,
+            'reason': pending.reason,
+            'created_at': pending.created_at,
+        }
 
     def to_internal_value(self, data):
         raw_data = data.copy() if hasattr(data, 'copy') else dict(data)
