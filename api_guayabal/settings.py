@@ -7,6 +7,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+# Clave secreta de Django (en produccion debe venir desde variables de entorno).
 SECRET_KEY = 'django-insecure-+^r^8axypcaff45vn7y9v#i=#oab1#18tn0%n(%nika5knpbqv'
 
 
@@ -67,6 +68,7 @@ TEMPLATES = [
     },
 ]
 
+# Configuracion global de DRF: exige JWT (Bearer token) en endpoints protegidos.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',

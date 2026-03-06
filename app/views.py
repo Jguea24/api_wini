@@ -32,6 +32,7 @@ from .serializers import (
     ProductSerializer,
     CartSerializer,
     RegisterSerializer,
+    RegisteredUserSerializer,
     OrderCreateSerializer,
     OrderSerializer,
     ShipmentSerializer,
@@ -44,10 +45,14 @@ from .serializers import (
 )
 
 
-class RegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = RegisterSerializer
+class RegisterView(generics.ListCreateAPIView):
+    queryset = User.objects.select_related('profile').prefetch_related('groups').order_by('-id')
     permission_classes = [permissions.AllowAny]
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return RegisteredUserSerializer
+        return RegisterSerializer
 
 
 class LoginView(APIView):

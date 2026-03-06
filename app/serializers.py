@@ -62,6 +62,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         if 'phone' not in raw_data:
             raw_data['phone'] = (
                 data.get('phone')
+                or data.get('Phone')
                 or data.get('telefono')
                 or data.get('celular')
                 or ''
@@ -70,7 +71,13 @@ class RegisterSerializer(serializers.ModelSerializer):
         if 'address' not in raw_data:
             raw_data['address'] = (
                 data.get('address')
+                or data.get('Address')
                 or data.get('direccion')
+                or data.get('dirección')
+                or data.get('main_address')
+                or data.get('direccion_principal')
+                or data.get('address_line_1')
+                or data.get('street')
                 or ''
             )
 
@@ -118,6 +125,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         email = (attrs.get('email') or '').strip().lower()
         username = (attrs.get('username') or '').strip()
         phone = (attrs.get('phone') or '').strip()
+        address = (attrs.get('address') or '').strip()
         role = (attrs.get('role') or '').strip().lower()
 
         if not password:
@@ -137,6 +145,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         if not phone.startswith('09'):
             raise serializers.ValidationError({'phone': 'El telefono debe iniciar con 09.'})
+
+        if not address:
+            raise serializers.ValidationError({'address': 'La direccion es obligatoria.'})
 
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError({'email': 'Ya existe una cuenta con este correo.'})
@@ -170,6 +181,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         attrs['email'] = email
         attrs['phone'] = phone
+        attrs['address'] = address
         attrs['role'] = normalized_role
         return attrs
 
@@ -215,6 +227,40 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
 
         return user
+
+
+class RegisteredUserSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    address = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'full_name',
+            'phone',
+            'address',
+            'roles',
+            'date_joined',
+            'is_active',
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, instance):
+        return f'{instance.first_name} {instance.last_name}'.strip()
+
+    def get_phone(self, instance):
+        return getattr(getattr(instance, 'profile', None), 'phone', '')
+
+    def get_address(self, instance):
+        return getattr(getattr(instance, 'profile', None), 'address', '')
+
+    def get_roles(self, instance):
+        return sorted(list(instance.groups.values_list('name', flat=True)))
 
 
 # =====================================================
