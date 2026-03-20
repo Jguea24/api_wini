@@ -1,5 +1,5 @@
-from django.apps import AppConfig
+from django.apps import AppConfig  # comentario
 
 
-class AppConfig(AppConfig):
-    name = 'app'
+class AppConfig(AppConfig):  # comentario
+    name = 'app'  # comentario

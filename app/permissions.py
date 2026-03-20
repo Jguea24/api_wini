@@ -1,17 +1,17 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission  # comentario
 
-class IsAdminRole(BasePermission):
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.groups.filter(name="ADMIN").exists()
-        )
+class IsAdminRole(BasePermission):  # comentario
+    def has_permission(self, request, view):  # comentario
+        return (  # comentario
+            request.user  # comentario
+            and request.user.is_authenticated  # comentario
+            and request.user.groups.filter(name="ADMIN").exists()  # comentario
+        )  # comentario
 
-class IsClienteRole(BasePermission):
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.groups.filter(name="CLIENTE").exists()
-        )
+class IsClienteRole(BasePermission):  # comentario
+    def has_permission(self, request, view):  # comentario
+        return (  # comentario
+            request.user  # comentario
+            and request.user.is_authenticated  # comentario
+            and request.user.groups.filter(name="CLIENTE").exists()  # comentario
+        )  # comentario
