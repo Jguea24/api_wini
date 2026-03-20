@@ -1,251 +1,2008 @@
-from django.db import models  # comentario
-from django.contrib.auth.models import Group, User  # comentario
-from django.db.models.signals import post_save  # comentario
-from django.dispatch import receiver  # comentario
-
-
-class Category(models.Model):  # comentario
-    name = models.CharField(max_length=100, unique=True)  # comentario
-    order = models.PositiveIntegerField(default=0)  # comentario
-    image = models.ImageField(upload_to='categories/', blank=True, null=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['order', 'name']  # comentario
-
-    def __str__(self):  # comentario
-        return self.name  # comentario
-
-
-class Banner(models.Model):  # comentario
-    title = models.CharField(max_length=120, blank=True)  # comentario
-    image = models.ImageField(upload_to='banners/')  # comentario
-    order = models.PositiveIntegerField(default=0)  # comentario
-    is_active = models.BooleanField(default=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['order', 'id']  # comentario
-
-    def __str__(self):  # comentario
-        return self.title or f'Banner {self.id}'  # comentario
-
-
-class Product(models.Model):  # comentario
-    name = models.CharField(max_length=100)  # comentario
-    price = models.DecimalField(max_digits=8, decimal_places=2)  # comentario
-    old_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)  # comentario
-    description = models.TextField(blank=True)  # comentario
-    store_name = models.CharField(max_length=120, blank=True)  # comentario
-    rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)  # comentario
-    reviews_count = models.PositiveIntegerField(default=0)  # comentario
-    stock = models.IntegerField()  # comentario
-    image = models.ImageField(upload_to='products/', blank=True, null=True)  # comentario
-    category = models.ForeignKey(  # comentario
-        Category,  # comentario
-        on_delete=models.SET_NULL,  # comentario
-        null=True,  # comentario
-        blank=True,  # comentario
-        related_name='products'  # comentario
-    )  # comentario
-
-    def __str__(self):  # comentario
-        return self.name  # comentario
-
-
-class Cart(models.Model):  # comentario
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # comentario
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)  # comentario
-    quantity = models.IntegerField(default=1)  # comentario
-
-    def __str__(self):  # comentario
-        return f"{self.user.username} - {self.product.name}"  # comentario
-
-
-class UserProfile(models.Model):  # comentario
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')  # comentario
-    phone = models.CharField(max_length=20, blank=True)  # comentario
-    address = models.CharField(max_length=255, blank=True)  # comentario
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)  # comentario
-
-    def __str__(self):  # comentario
-        return f"Perfil de {self.user.username}"  # comentario
-
-
-class DeliveryAddress(models.Model):  # comentario
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_addresses')  # comentario
-    main_address = models.CharField(max_length=255)  # comentario
-    secondary_street = models.CharField(max_length=255, blank=True)  # comentario
-    apartment = models.CharField(max_length=120, blank=True)  # comentario
-    city = models.CharField(max_length=120)  # comentario
-    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    delivery_instructions = models.TextField(blank=True)  # comentario
-    is_default = models.BooleanField(default=False)  # comentario
-    created_at = models.DateTimeField(auto_now_add=True)  # comentario
-    updated_at = models.DateTimeField(auto_now=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['-is_default', '-id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"{self.user.username} - {self.main_address} ({self.city})"  # comentario
-
-
-class RoleChangeRequest(models.Model):  # comentario
-    ROLE_CHOICES = [  # comentario
-        ('provider', 'Proveedor'),  # comentario
-        ('driver', 'Repartidor'),  # comentario
-    ]  # comentario
-    STATUS_CHOICES = [  # comentario
-        ('pending', 'Pendiente'),  # comentario
-        ('approved', 'Aprobada'),  # comentario
-        ('rejected', 'Rechazada'),  # comentario
-    ]  # comentario
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='role_change_requests')  # comentario
-    requested_role = models.CharField(max_length=20, choices=ROLE_CHOICES)  # comentario
-    reason = models.TextField(blank=True)  # comentario
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')  # comentario
-    created_at = models.DateTimeField(auto_now_add=True)  # comentario
-    updated_at = models.DateTimeField(auto_now=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['-id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"{self.user.username} -> {self.requested_role} ({self.status})"  # comentario
-
-
-class Order(models.Model):  # comentario
-    STATUS_CHOICES = [  # comentario
-        ('pending', 'Pendiente'),  # comentario
-        ('confirmed', 'Confirmado'),  # comentario
-        ('preparing', 'En preparacion'),  # comentario
-        ('on_the_way', 'En camino'),  # comentario
-        ('delivered', 'Entregado'),  # comentario
-        ('cancelled', 'Cancelado'),  # comentario
-    ]  # comentario
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')  # comentario
-    delivery_address = models.ForeignKey(  # comentario
-        DeliveryAddress,  # comentario
-        on_delete=models.SET_NULL,  # comentario
-        null=True,  # comentario
-        blank=True,  # comentario
-        related_name='orders',  # comentario
-    )  # comentario
-    delivery_main_address = models.CharField(max_length=255)  # comentario
-    delivery_secondary_street = models.CharField(max_length=255, blank=True)  # comentario
-    delivery_apartment = models.CharField(max_length=120, blank=True)  # comentario
-    delivery_city = models.CharField(max_length=120)  # comentario
-    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    delivery_instructions = models.TextField(blank=True)  # comentario
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')  # comentario
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # comentario
-    total_items = models.PositiveIntegerField(default=0)  # comentario
-    created_at = models.DateTimeField(auto_now_add=True)  # comentario
-    updated_at = models.DateTimeField(auto_now=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['-id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"Pedido #{self.id} - {self.user.username} ({self.status})"  # comentario
-
-
-class OrderItem(models.Model):  # comentario
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')  # comentario
-    product = models.ForeignKey(  # comentario
-        Product,  # comentario
-        on_delete=models.SET_NULL,  # comentario
-        null=True,  # comentario
-        blank=True,  # comentario
-        related_name='order_items',  # comentario
-    )  # comentario
-    product_name = models.CharField(max_length=100)  # comentario
-    product_price = models.DecimalField(max_digits=8, decimal_places=2)  # comentario
-    quantity = models.PositiveIntegerField(default=1)  # comentario
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"{self.order_id} - {self.product_name} x{self.quantity}"  # comentario
-
-
-class Shipment(models.Model):  # comentario
-    STATUS_CHOICES = [  # comentario
-        ('pending_assignment', 'Pendiente de asignacion'),  # comentario
-        ('assigned', 'Asignado'),  # comentario
-        ('picked_up', 'Recogido'),  # comentario
-        ('on_the_way', 'En camino'),  # comentario
-        ('nearby', 'Cerca del destino'),  # comentario
-        ('delivered', 'Entregado'),  # comentario
-        ('cancelled', 'Cancelado'),  # comentario
-    ]  # comentario
-
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='shipment')  # comentario
-    driver = models.ForeignKey(  # comentario
-        User,  # comentario
-        on_delete=models.SET_NULL,  # comentario
-        null=True,  # comentario
-        blank=True,  # comentario
-        related_name='shipments_assigned',  # comentario
-    )  # comentario
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_assignment')  # comentario
-    current_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    current_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # comentario
-    current_heading = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # comentario
-    current_speed = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # comentario
-    last_location_at = models.DateTimeField(null=True, blank=True)  # comentario
-    eta_minutes = models.PositiveIntegerField(null=True, blank=True)  # comentario
-    notes = models.CharField(max_length=255, blank=True)  # comentario
-    created_at = models.DateTimeField(auto_now_add=True)  # comentario
-    updated_at = models.DateTimeField(auto_now=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['-id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"Envio #{self.id} - Pedido #{self.order_id} ({self.status})"  # comentario
-
-
-class ShipmentLocation(models.Model):  # comentario
-    shipment = models.ForeignKey(Shipment, on_delete=models.CASCADE, related_name='locations')  # comentario
-    latitude = models.DecimalField(max_digits=9, decimal_places=6)  # comentario
-    longitude = models.DecimalField(max_digits=9, decimal_places=6)  # comentario
-    heading = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # comentario
-    speed = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # comentario
-    recorded_at = models.DateTimeField(auto_now_add=True)  # comentario
-
-    class Meta:  # comentario
-        ordering = ['-recorded_at', '-id']  # comentario
-
-    def __str__(self):  # comentario
-        return f"{self.shipment_id} @ {self.latitude},{self.longitude}"  # comentario
-
-
-@receiver(post_save, sender=User)  # comentario
-def create_user_profile(sender, instance, created, **kwargs):  # comentario
-    if created:  # comentario
-        UserProfile.objects.get_or_create(user=instance)  # comentario
-
-
-@receiver(post_save, sender=RoleChangeRequest)  # comentario
-def sync_user_groups_on_role_approval(sender, instance, **kwargs):  # comentario
-    if instance.status != 'approved':  # comentario
-        return  # comentario
-
-    user = instance.user  # comentario
-    cliente_group, _ = Group.objects.get_or_create(name='CLIENTE')  # comentario
-    user.groups.add(cliente_group)  # comentario
-
-    if instance.requested_role == 'driver':  # comentario
-        driver_group, _ = Group.objects.get_or_create(name='DRIVER')  # comentario
-        user.groups.add(driver_group)  # comentario
-        return  # comentario
-
-    if instance.requested_role == 'provider':  # comentario
-        provider_group, _ = Group.objects.get_or_create(name='PROVIDER')  # comentario
-        user.groups.add(provider_group)  # comentario
+from django.db import models  # Importa models desde `django.db`.
+
+
+
+
+
+
+
+from django.contrib.auth.models import Group, User  # Importa Group, User desde `django.contrib.auth.models`.
+
+
+
+
+
+
+
+from django.db.models.signals import post_save  # Importa post_save desde `django.db.models.signals`.
+
+
+
+
+
+
+
+from django.dispatch import receiver  # Importa receiver desde `django.dispatch`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Category(models.Model):  # Define la clase `Category`.
+
+
+
+
+
+
+
+    name = models.CharField(max_length=100, unique=True)  # Asigna a `name` un campo `CharField`.
+
+
+
+
+
+
+
+    order = models.PositiveIntegerField(default=0)  # Asigna a `order` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    image = models.ImageField(upload_to='categories/', blank=True, null=True)  # Asigna a `image` un campo `ImageField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['order', 'name']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return self.name  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Banner(models.Model):  # Define la clase `Banner`.
+
+
+
+
+
+
+
+    title = models.CharField(max_length=120, blank=True)  # Asigna a `title` un campo `CharField`.
+
+
+
+
+
+
+
+    image = models.ImageField(upload_to='banners/')  # Asigna a `image` un campo `ImageField`.
+
+
+
+
+
+
+
+    order = models.PositiveIntegerField(default=0)  # Asigna a `order` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    is_active = models.BooleanField(default=True)  # Asigna a `is_active` un campo `BooleanField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['order', 'id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return self.title or f'Banner {self.id}'  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Product(models.Model):  # Define la clase `Product`.
+
+
+
+
+
+
+
+    name = models.CharField(max_length=100)  # Asigna a `name` un campo `CharField`.
+
+
+
+
+
+
+
+    price = models.DecimalField(max_digits=8, decimal_places=2)  # Asigna a `price` un campo `DecimalField`.
+
+
+
+
+
+
+
+    old_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)  # Asigna a `old_price` un campo `DecimalField`.
+
+
+
+
+
+
+
+    description = models.TextField(blank=True)  # Asigna a `description` un campo `TextField`.
+
+
+
+
+
+
+
+    store_name = models.CharField(max_length=120, blank=True)  # Asigna a `store_name` un campo `CharField`.
+
+
+
+
+
+
+
+    rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)  # Asigna a `rating` un campo `DecimalField`.
+
+
+
+
+
+
+
+    reviews_count = models.PositiveIntegerField(default=0)  # Asigna a `reviews_count` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    stock = models.IntegerField()  # Asigna a `stock` un campo `IntegerField`.
+
+
+
+
+
+
+
+    image = models.ImageField(upload_to='products/', blank=True, null=True)  # Asigna a `image` un campo `ImageField`.
+
+
+
+
+
+
+
+    category = models.ForeignKey(  # Asigna a `category` un campo `ForeignKey`.
+
+
+
+
+
+
+
+        Category,  # Referencia `Category` en la estructura/expresion.
+
+
+
+
+
+
+
+        on_delete=models.SET_NULL,  # Asigna un valor a `on_delete`.
+
+
+
+
+
+
+
+        null=True,  # Asigna un valor a `null`.
+
+
+
+
+
+
+
+        blank=True,  # Asigna un valor a `blank`.
+
+
+
+
+
+
+
+        related_name='products'  # Asigna un valor a `related_name`.
+
+
+
+
+
+
+
+    )  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return self.name  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Cart(models.Model):  # Define la clase `Cart`.
+
+
+
+
+
+
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Asigna a `user` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)  # Asigna a `product` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    quantity = models.IntegerField(default=1)  # Asigna a `quantity` un campo `IntegerField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"{self.user.username} - {self.product.name}"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class UserProfile(models.Model):  # Define la clase `UserProfile`.
+
+
+
+
+
+
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')  # Asigna a `user` un campo `OneToOneField`.
+
+
+
+
+
+
+
+    phone = models.CharField(max_length=20, blank=True)  # Asigna a `phone` un campo `CharField`.
+
+
+
+
+
+
+
+    address = models.CharField(max_length=255, blank=True)  # Asigna a `address` un campo `CharField`.
+
+
+
+
+
+
+
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)  # Asigna a `avatar` un campo `ImageField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"Perfil de {self.user.username}"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class DeliveryAddress(models.Model):  # Define la clase `DeliveryAddress`.
+
+
+
+
+
+
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_addresses')  # Asigna a `user` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    main_address = models.CharField(max_length=255)  # Asigna a `main_address` un campo `CharField`.
+
+
+
+
+
+
+
+    secondary_street = models.CharField(max_length=255, blank=True)  # Asigna a `secondary_street` un campo `CharField`.
+
+
+
+
+
+
+
+    apartment = models.CharField(max_length=120, blank=True)  # Asigna a `apartment` un campo `CharField`.
+
+
+
+
+
+
+
+    city = models.CharField(max_length=120)  # Asigna a `city` un campo `CharField`.
+
+
+
+
+
+
+
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `latitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `longitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    delivery_instructions = models.TextField(blank=True)  # Asigna a `delivery_instructions` un campo `TextField`.
+
+
+
+
+
+
+
+    is_default = models.BooleanField(default=False)  # Asigna a `is_default` un campo `BooleanField`.
+
+
+
+
+
+
+
+    created_at = models.DateTimeField(auto_now_add=True)  # Asigna a `created_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+    updated_at = models.DateTimeField(auto_now=True)  # Asigna a `updated_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['-is_default', '-id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"{self.user.username} - {self.main_address} ({self.city})"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class RoleChangeRequest(models.Model):  # Define la clase `RoleChangeRequest`.
+
+
+
+
+
+
+
+    ROLE_CHOICES = [  # Asigna un valor a `ROLE_CHOICES`.
+
+
+
+
+
+
+
+        ('provider', 'Proveedor'),  # Agrega la tupla `provider` a la estructura.
+
+
+
+
+
+
+
+        ('driver', 'Repartidor'),  # Agrega la tupla `driver` a la estructura.
+
+
+
+
+
+
+
+    ]  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+    STATUS_CHOICES = [  # Asigna un valor a `STATUS_CHOICES`.
+
+
+
+
+
+
+
+        ('pending', 'Pendiente'),  # Agrega la tupla `pending` a la estructura.
+
+
+
+
+
+
+
+        ('approved', 'Aprobada'),  # Agrega la tupla `approved` a la estructura.
+
+
+
+
+
+
+
+        ('rejected', 'Rechazada'),  # Agrega la tupla `rejected` a la estructura.
+
+
+
+
+
+
+
+    ]  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='role_change_requests')  # Asigna a `user` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    requested_role = models.CharField(max_length=20, choices=ROLE_CHOICES)  # Asigna a `requested_role` un campo `CharField`.
+
+
+
+
+
+
+
+    reason = models.TextField(blank=True)  # Asigna a `reason` un campo `TextField`.
+
+
+
+
+
+
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')  # Asigna a `status` un campo `CharField`.
+
+
+
+
+
+
+
+    created_at = models.DateTimeField(auto_now_add=True)  # Asigna a `created_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+    updated_at = models.DateTimeField(auto_now=True)  # Asigna a `updated_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['-id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"{self.user.username} -> {self.requested_role} ({self.status})"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Order(models.Model):  # Define la clase `Order`.
+
+
+
+
+
+
+
+    STATUS_CHOICES = [  # Asigna un valor a `STATUS_CHOICES`.
+
+
+
+
+
+
+
+        ('pending', 'Pendiente'),  # Agrega la tupla `pending` a la estructura.
+
+
+
+
+
+
+
+        ('confirmed', 'Confirmado'),  # Agrega la tupla `confirmed` a la estructura.
+
+
+
+
+
+
+
+        ('preparing', 'En preparacion'),  # Agrega la tupla `preparing` a la estructura.
+
+
+
+
+
+
+
+        ('on_the_way', 'En camino'),  # Agrega la tupla `on_the_way` a la estructura.
+
+
+
+
+
+
+
+        ('delivered', 'Entregado'),  # Agrega la tupla `delivered` a la estructura.
+
+
+
+
+
+
+
+        ('cancelled', 'Cancelado'),  # Agrega la tupla `cancelled` a la estructura.
+
+
+
+
+
+
+
+    ]  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')  # Asigna a `user` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    delivery_address = models.ForeignKey(  # Asigna a `delivery_address` un campo `ForeignKey`.
+
+
+
+
+
+
+
+        DeliveryAddress,  # Referencia `DeliveryAddress` en la estructura/expresion.
+
+
+
+
+
+
+
+        on_delete=models.SET_NULL,  # Asigna un valor a `on_delete`.
+
+
+
+
+
+
+
+        null=True,  # Asigna un valor a `null`.
+
+
+
+
+
+
+
+        blank=True,  # Asigna un valor a `blank`.
+
+
+
+
+
+
+
+        related_name='orders',  # Asigna un valor a `related_name`.
+
+
+
+
+
+
+
+    )  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+    delivery_main_address = models.CharField(max_length=255)  # Asigna a `delivery_main_address` un campo `CharField`.
+
+
+
+
+
+
+
+    delivery_secondary_street = models.CharField(max_length=255, blank=True)  # Asigna a `delivery_secondary_street` un campo `CharField`.
+
+
+
+
+
+
+
+    delivery_apartment = models.CharField(max_length=120, blank=True)  # Asigna a `delivery_apartment` un campo `CharField`.
+
+
+
+
+
+
+
+    delivery_city = models.CharField(max_length=120)  # Asigna a `delivery_city` un campo `CharField`.
+
+
+
+
+
+
+
+    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `delivery_latitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `delivery_longitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    delivery_instructions = models.TextField(blank=True)  # Asigna a `delivery_instructions` un campo `TextField`.
+
+
+
+
+
+
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')  # Asigna a `status` un campo `CharField`.
+
+
+
+
+
+
+
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Asigna a `total_amount` un campo `DecimalField`.
+
+
+
+
+
+
+
+    total_items = models.PositiveIntegerField(default=0)  # Asigna a `total_items` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    created_at = models.DateTimeField(auto_now_add=True)  # Asigna a `created_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+    updated_at = models.DateTimeField(auto_now=True)  # Asigna a `updated_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['-id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"Pedido #{self.id} - {self.user.username} ({self.status})"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class OrderItem(models.Model):  # Define la clase `OrderItem`.
+
+
+
+
+
+
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')  # Asigna a `order` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    product = models.ForeignKey(  # Asigna a `product` un campo `ForeignKey`.
+
+
+
+
+
+
+
+        Product,  # Referencia `Product` en la estructura/expresion.
+
+
+
+
+
+
+
+        on_delete=models.SET_NULL,  # Asigna un valor a `on_delete`.
+
+
+
+
+
+
+
+        null=True,  # Asigna un valor a `null`.
+
+
+
+
+
+
+
+        blank=True,  # Asigna un valor a `blank`.
+
+
+
+
+
+
+
+        related_name='order_items',  # Asigna un valor a `related_name`.
+
+
+
+
+
+
+
+    )  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+    product_name = models.CharField(max_length=100)  # Asigna a `product_name` un campo `CharField`.
+
+
+
+
+
+
+
+    product_price = models.DecimalField(max_digits=8, decimal_places=2)  # Asigna a `product_price` un campo `DecimalField`.
+
+
+
+
+
+
+
+    quantity = models.PositiveIntegerField(default=1)  # Asigna a `quantity` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Asigna a `subtotal` un campo `DecimalField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"{self.order_id} - {self.product_name} x{self.quantity}"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Shipment(models.Model):  # Define la clase `Shipment`.
+
+
+
+
+
+
+
+    STATUS_CHOICES = [  # Asigna un valor a `STATUS_CHOICES`.
+
+
+
+
+
+
+
+        ('pending_assignment', 'Pendiente de asignacion'),  # Agrega la tupla `pending_assignment` a la estructura.
+
+
+
+
+
+
+
+        ('assigned', 'Asignado'),  # Agrega la tupla `assigned` a la estructura.
+
+
+
+
+
+
+
+        ('picked_up', 'Recogido'),  # Agrega la tupla `picked_up` a la estructura.
+
+
+
+
+
+
+
+        ('on_the_way', 'En camino'),  # Agrega la tupla `on_the_way` a la estructura.
+
+
+
+
+
+
+
+        ('nearby', 'Cerca del destino'),  # Agrega la tupla `nearby` a la estructura.
+
+
+
+
+
+
+
+        ('delivered', 'Entregado'),  # Agrega la tupla `delivered` a la estructura.
+
+
+
+
+
+
+
+        ('cancelled', 'Cancelado'),  # Agrega la tupla `cancelled` a la estructura.
+
+
+
+
+
+
+
+    ]  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='shipment')  # Asigna a `order` un campo `OneToOneField`.
+
+
+
+
+
+
+
+    driver = models.ForeignKey(  # Asigna a `driver` un campo `ForeignKey`.
+
+
+
+
+
+
+
+        User,  # Referencia `User` en la estructura/expresion.
+
+
+
+
+
+
+
+        on_delete=models.SET_NULL,  # Asigna un valor a `on_delete`.
+
+
+
+
+
+
+
+        null=True,  # Asigna un valor a `null`.
+
+
+
+
+
+
+
+        blank=True,  # Asigna un valor a `blank`.
+
+
+
+
+
+
+
+        related_name='shipments_assigned',  # Asigna un valor a `related_name`.
+
+
+
+
+
+
+
+    )  # Cierra el bloque/estructura.
+
+
+
+
+
+
+
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_assignment')  # Asigna a `status` un campo `CharField`.
+
+
+
+
+
+
+
+    current_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `current_latitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    current_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)  # Asigna a `current_longitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    current_heading = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # Asigna a `current_heading` un campo `DecimalField`.
+
+
+
+
+
+
+
+    current_speed = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # Asigna a `current_speed` un campo `DecimalField`.
+
+
+
+
+
+
+
+    last_location_at = models.DateTimeField(null=True, blank=True)  # Asigna a `last_location_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+    eta_minutes = models.PositiveIntegerField(null=True, blank=True)  # Asigna a `eta_minutes` un campo `PositiveIntegerField`.
+
+
+
+
+
+
+
+    notes = models.CharField(max_length=255, blank=True)  # Asigna a `notes` un campo `CharField`.
+
+
+
+
+
+
+
+    created_at = models.DateTimeField(auto_now_add=True)  # Asigna a `created_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+    updated_at = models.DateTimeField(auto_now=True)  # Asigna a `updated_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['-id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"Envio #{self.id} - Pedido #{self.order_id} ({self.status})"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ShipmentLocation(models.Model):  # Define la clase `ShipmentLocation`.
+
+
+
+
+
+
+
+    shipment = models.ForeignKey(Shipment, on_delete=models.CASCADE, related_name='locations')  # Asigna a `shipment` un campo `ForeignKey`.
+
+
+
+
+
+
+
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)  # Asigna a `latitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)  # Asigna a `longitude` un campo `DecimalField`.
+
+
+
+
+
+
+
+    heading = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # Asigna a `heading` un campo `DecimalField`.
+
+
+
+
+
+
+
+    speed = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)  # Asigna a `speed` un campo `DecimalField`.
+
+
+
+
+
+
+
+    recorded_at = models.DateTimeField(auto_now_add=True)  # Asigna a `recorded_at` un campo `DateTimeField`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    class Meta:  # Define la clase `Meta`.
+
+
+
+
+
+
+
+        ordering = ['-recorded_at', '-id']  # Asigna un valor a `ordering`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def __str__(self):  # Define la funcion `__str__`.
+
+
+
+
+
+
+
+        return f"{self.shipment_id} @ {self.latitude},{self.longitude}"  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@receiver(post_save, sender=User)  # Aplica el decorador `receiver`.
+
+
+
+
+
+
+
+def create_user_profile(sender, instance, created, **kwargs):  # Define la funcion `create_user_profile`.
+
+
+
+
+
+
+
+    if created:  # Evalua la condicion del `if`.
+
+
+
+
+
+
+
+        UserProfile.objects.get_or_create(user=instance)  # Ejecuta `UserProfile.objects.get_or_create`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@receiver(post_save, sender=RoleChangeRequest)  # Aplica el decorador `receiver`.
+
+
+
+
+
+
+
+def sync_user_groups_on_role_approval(sender, instance, **kwargs):  # Define la funcion `sync_user_groups_on_role_approval`.
+
+
+
+
+
+
+
+    if instance.status != 'approved':  # Evalua la condicion del `if`.
+
+
+
+
+
+
+
+        return  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    user = instance.user  # Asigna un valor a `user`.
+
+
+
+
+
+
+
+    cliente_group, _ = Group.objects.get_or_create(name='CLIENTE')  # Asigna a `cliente_group` y `_` el resultado de `Group.objects.get_or_create`.
+
+
+
+
+
+
+
+    user.groups.add(cliente_group)  # Ejecuta `user.groups.add`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if instance.requested_role == 'driver':  # Evalua la condicion del `if`.
+
+
+
+
+
+
+
+        driver_group, _ = Group.objects.get_or_create(name='DRIVER')  # Asigna a `driver_group` y `_` el resultado de `Group.objects.get_or_create`.
+
+
+
+
+
+
+
+        user.groups.add(driver_group)  # Ejecuta `user.groups.add`.
+
+
+
+
+
+
+
+        return  # Devuelve un valor (`return`).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    if instance.requested_role == 'provider':  # Evalua la condicion del `if`.
+
+
+
+
+
+
+
+        provider_group, _ = Group.objects.get_or_create(name='PROVIDER')  # Asigna a `provider_group` y `_` el resultado de `Group.objects.get_or_create`.
+
+
+
+
+
+
+
+        user.groups.add(provider_group)  # Ejecuta `user.groups.add`.
+
+
+
+
+
+
+
