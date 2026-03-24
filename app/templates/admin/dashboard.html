@@ -1,0 +1,534 @@
+﻿{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block header %}{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+<link id="bootstrap-cdn-fallback" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script>
+  (function () {
+    // If local Bootstrap loads, disable CDN duplicate styles.
+    window.addEventListener('load', function () {
+      var hasLocal = false;
+      for (var i = 0; i < document.styleSheets.length; i++) {
+        var href = (document.styleSheets[i] && document.styleSheets[i].href) || '';
+        if (href.indexOf('/static/vendor/bootstrap/bootstrap.min.css') !== -1) {
+          hasLocal = true;
+          break;
+        }
+      }
+      if (hasLocal) {
+        var cdn = document.getElementById('bootstrap-cdn-fallback');
+        if (cdn) cdn.disabled = true;
+      }
+    });
+  })();
+</script>
+<script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+<script>
+  (function () {
+    // If local Bootstrap JS is unavailable, load CDN fallback.
+    if (typeof window.bootstrap === 'undefined') {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js';
+      document.head.appendChild(script);
+    }
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  #container, .main, main.content, #content { margin: 0; padding: 0; }
+  :root {
+    --wini-bg: #edf5ef;
+    --wini-bg-dark: #0f1914;
+    --wini-surface: #ffffff;
+    --wini-sidebar-soft: #eef8f1;
+    --wini-border: rgba(22, 54, 35, 0.14);
+    --wini-accent: #1f7a4d;
+    --wini-accent-strong: #145a37;
+    --wini-accent-soft: rgba(31, 122, 77, 0.15);
+    --wini-text: #0f1f16;
+  }
+
+  body { background: var(--wini-bg); color: var(--wini-text); }
+  body.dark-mode { background: var(--wini-bg-dark); }
+
+  .app-shell { height: 100vh; overflow: hidden; }
+  .app-sidebar {
+    width: 300px;
+    background: linear-gradient(180deg, var(--wini-surface) 0%, var(--wini-sidebar-soft) 100%);
+    border-right: 1px solid var(--wini-border);
+  }
+  body.dark-mode .app-sidebar {
+    background: linear-gradient(180deg, #16241d 0%, #0f1914 100%);
+    border-right-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .brand-dot {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: var(--wini-accent-strong);
+    color: #fff;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  body.dark-mode .brand-dot { background: #2b8c5c; }
+
+  .sidebar-scroll, .content-scroll { overflow: auto; }
+  .sidebar-scroll { height: calc(100vh - 96px); }
+  .content-scroll { height: calc(100vh - 104px); }
+
+  .sidebar-link {
+    border-radius: 12px;
+    border: 1px solid transparent;
+  }
+  .sidebar-link.active {
+    background: var(--wini-accent-soft);
+    border-color: rgba(31, 122, 77, 0.42);
+    color: var(--wini-accent-strong);
+    font-weight: 600;
+  }
+  body.dark-mode .sidebar-link.active {
+    color: #e8fff2;
+    background: rgba(43, 140, 92, 0.24);
+    border-color: rgba(77, 201, 134, 0.36);
+  }
+
+  .accordion-item.menu-group {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.7);
+  }
+  body.dark-mode .accordion-item.menu-group {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .accordion-button.menu-title {
+    background: transparent;
+    box-shadow: none;
+    font-weight: 600;
+    padding: 0.65rem 0.85rem;
+  }
+  .accordion-button.menu-title:not(.collapsed) {
+    color: inherit;
+    background: var(--wini-accent-soft);
+  }
+
+  .model-pill {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(31, 122, 77, 0.18);
+    border: 1px solid rgba(31, 122, 77, 0.42);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .topbar-card,
+  .panel-card,
+  .metric-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: rgba(255, 255, 255, 0.76);
+    border-radius: 1rem;
+  }
+  body.dark-mode .topbar-card,
+  body.dark-mode .panel-card,
+  body.dark-mode .metric-card {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .canvas-box { height: 280px; }
+  .canvas-box > canvas { width: 100% !important; height: 100% !important; }
+
+  .btn-mono {
+    background: var(--wini-accent);
+    border-color: var(--wini-accent);
+    color: #fff;
+  }
+  .btn-mono:hover {
+    background: var(--wini-accent-strong);
+    border-color: var(--wini-accent-strong);
+    color: #fff;
+  }
+  body.dark-mode .btn-mono {
+    background: #2b8c5c;
+    border-color: #2b8c5c;
+    color: #f5fff8;
+  }
+
+  .utility-bar {
+    background: #2f6f86;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 0.6rem;
+    color: #f8fdff;
+    padding: 0.75rem 1rem;
+  }
+  .utility-bar a {
+    color: #f8fdff;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .utility-bar a:hover { color: #ffffff; }
+  .utility-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .utility-links {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .utility-links form { margin: 0; display: inline; }
+  .utility-link-btn {
+    background: transparent;
+    border: 0;
+    color: #f8fdff;
+    padding: 0;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+  }
+  .utility-link-btn:hover { color: #ffffff; }
+
+  .theme-toggle-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border-color: #ffffff;
+  }
+  body.dark-mode .theme-toggle-btn {
+    background: rgba(255, 255, 255, 0.12);
+    color: #f3f4f6;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  body.dark-mode .theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+    border-color: #ffffff;
+  }
+
+  @media (max-width: 1200px) {
+    .app-sidebar { display: none !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app-shell d-flex">
+  {{ dashboard|json_script:"dashboard-data" }}
+
+  <aside class="app-sidebar d-flex flex-column p-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="brand-dot">W</span>
+      <div>
+        <div class="fw-bold">Wini Admin</div>
+        <small class="text-body-secondary">Control panel</small>
+      </div>
+    </div>
+
+    <div class="sidebar-scroll pe-1">
+      <a href="{% url 'admin:index' %}" class="sidebar-link active d-flex align-items-center justify-content-between text-decoration-none px-3 py-2 mb-2">
+        <span>{% trans "Dashboard" %}</span>
+        <span class="badge text-bg-light">/</span>
+      </a>
+
+      <div class="accordion" id="appsAccordion">
+        {% for app in app_list %}
+          <div class="accordion-item menu-group mb-2">
+            <h2 class="accordion-header" id="app-h-{{ forloop.counter }}">
+              <button class="accordion-button menu-title collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#app-c-{{ forloop.counter }}" aria-expanded="false" aria-controls="app-c-{{ forloop.counter }}">
+                <span class="d-inline-flex align-items-center gap-2">
+                  <span class="model-pill">{{ app.name|slice:":1"|upper }}</span>
+                  <span>{{ app.name }}</span>
+                </span>
+              </button>
+            </h2>
+            <div id="app-c-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="app-h-{{ forloop.counter }}" data-bs-parent="#appsAccordion">
+              <div class="list-group list-group-flush">
+                {% for m in app.models %}
+                  {% if m.admin_url %}
+                    <div class="list-group-item bg-transparent border-0 px-2 py-1">
+                      <div class="d-flex align-items-center gap-2">
+                        <a href="{{ m.admin_url }}" class="flex-grow-1 text-decoration-none d-flex align-items-center gap-2 px-2 py-2 rounded-3">
+                          <span class="model-pill">{{ m.name|slice:":1"|upper }}</span>
+                          <span class="text-truncate">{{ m.name }}</span>
+                        </a>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% empty %}
+                  <div class="px-3 py-2 text-body-secondary small">{% trans "Sin modelos" %}</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="text-body-secondary small px-2">{% trans "Sin menus disponibles" %}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+
+  <section class="flex-grow-1 d-flex flex-column p-3">
+    <div class="utility-bar mb-3">
+      <div class="utility-row">
+        <div class="utility-links">
+          <span>{% blocktrans with name=user.get_short_name|default:user.get_username %}BIENVENIDO, {{ name }}.{% endblocktrans %}</span>
+          {% if site_url %}
+            <a href="{{ site_url }}">{% trans "VER SITIO" %}</a>
+            <span>/</span>
+          {% endif %}
+          {% if user.has_usable_password %}
+            <a href="{% url 'admin:password_change' %}">{% trans "CAMBIAR CONTRASENA" %}</a>
+            <span>/</span>
+          {% endif %}
+          <form method="post" action="{% url 'admin:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="utility-link-btn">{% trans "CERRAR SESION" %}</button>
+          </form>
+        </div>
+        <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="{% trans 'Cambiar tema' %}" title="{% trans 'Cambiar tema' %}">
+          <svg width="18" height="18" aria-hidden="true">
+            <use id="theme-toggle-icon" href="#icon-sun"></use>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="content-scroll pe-1">
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-4 col-xxl">
+          <div class="metric-card card h-100 shadow-sm"><div class="card-body"><div class="text-uppercase small text-body-secondary fw-semibold">{% trans "Usuarios" %}</div><div class="display-6 fw-bold lh-1 mt-2">{{ dashboard.counts.users }}</div><div class="small text-body-secondary mt-2">{% trans "Total registrados" %}</div></div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xxl">
+          <div class="metric-card card h-100 shadow-sm"><div class="card-body"><div class="text-uppercase small text-body-secondary fw-semibold">{% trans "Productos" %}</div><div class="display-6 fw-bold lh-1 mt-2">{{ dashboard.counts.products }}</div><div class="small text-body-secondary mt-2">{% trans "Inventario" %}</div></div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xxl">
+          <div class="metric-card card h-100 shadow-sm"><div class="card-body"><div class="text-uppercase small text-body-secondary fw-semibold">{% trans "Pedidos" %}</div><div class="display-6 fw-bold lh-1 mt-2">{{ dashboard.counts.orders }}</div><div class="small text-body-secondary mt-2">{% trans "Total" %}</div></div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xxl">
+          <div class="metric-card card h-100 shadow-sm"><div class="card-body"><div class="text-uppercase small text-body-secondary fw-semibold">{% trans "Envios" %}</div><div class="display-6 fw-bold lh-1 mt-2">{{ dashboard.counts.shipments }}</div><div class="small text-body-secondary mt-2">{% trans "Total" %}</div></div></div>
+        </div>
+        <div class="col-12 col-lg-8 col-xxl">
+          <div class="metric-card card h-100 shadow-sm"><div class="card-body"><div class="text-uppercase small text-body-secondary fw-semibold">{% trans "Ingresos" %}</div><div class="display-6 fw-bold lh-1 mt-2">${{ dashboard.revenue_total|floatformat:2 }}</div><div class="small text-body-secondary mt-2">{% trans "Pedidos entregados" %}</div></div></div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-xl-8">
+          <div class="panel-card card shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h6 mb-3">{% trans "Ingresos ultimos 14 dias" %}</h2>
+              <div class="canvas-box"><canvas id="revenueChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-4">
+          <div class="panel-card card shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h6 mb-3">{% trans "Estado de pedidos" %}</h2>
+              <div class="canvas-box"><canvas id="ordersStatusChart"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-xl-6">
+          <div class="panel-card card shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h6 mb-3">{% trans "Top productos" %}</h2>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>{% trans "Producto" %}</th><th class="text-end">{% trans "Unidades" %}</th><th class="text-end">{% trans "Subtotal" %}</th></tr></thead>
+                  <tbody>
+                    {% for p in dashboard.top_products %}
+                      <tr><td>{{ p.product_name|default:"-" }}</td><td class="text-end">{{ p.qty }}</td><td class="text-end">${{ p.total|floatformat:2 }}</td></tr>
+                    {% empty %}
+                      <tr><td colspan="3" class="text-body-secondary">{% trans "Sin datos" %}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-6">
+          <div class="panel-card card shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h6 mb-3">{% trans "Alertas" %}</h2>
+              <p class="mb-2">{% trans "Solicitudes pendientes" %}: <span class="badge text-bg-success">{{ dashboard.counts.pending_role_requests }}</span></p>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>{% trans "Producto" %}</th><th class="text-end">{% trans "Stock" %}</th></tr></thead>
+                  <tbody>
+                    {% for pr in low_stock %}
+                      <tr><td>{{ pr.name }}</td><td class="text-end"><span class="badge text-bg-dark">{{ pr.stock }}</span></td></tr>
+                    {% empty %}
+                      <tr><td colspan="2" class="text-body-secondary">{% trans "Sin alertas" %}</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card card shadow-sm">
+        <div class="card-body">
+          <h2 class="h6 mb-3">{% trans "Pedidos recientes" %}</h2>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead><tr><th>{% trans "Pedido" %}</th><th>{% trans "Usuario" %}</th><th>{% trans "Estado" %}</th><th class="text-end">{% trans "Total" %}</th><th class="text-end">{% trans "Creado" %}</th></tr></thead>
+              <tbody>
+                {% for o in recent_orders %}
+                  <tr>
+                    <td><a href="{% url 'admin:app_order_change' o.pk %}">#{{ o.pk }}</a></td>
+                    <td>{{ o.user.username }}</td>
+                    <td><span class="badge text-bg-success">{{ o.status }}</span></td>
+                    <td class="text-end">${{ o.total_amount|floatformat:2 }}</td>
+                    <td class="text-end text-body-secondary">{{ o.created_at|date:"Y-m-d H:i" }}</td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="5" class="text-body-secondary">{% trans "Sin pedidos" %}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  (function () {
+    const btn = document.getElementById('theme-toggle-btn');
+    const icon = document.getElementById('theme-toggle-icon');
+    if (!btn || !icon) return;
+
+    const storageKey = 'wini-admin-theme';
+
+    function applyTheme(theme) {
+      const isDark = theme === 'dark';
+      document.body.classList.toggle('dark-mode', isDark);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      icon.setAttribute('href', isDark ? '#icon-moon' : '#icon-sun');
+      btn.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+      btn.setAttribute('title', isDark ? 'Tema oscuro' : 'Tema claro');
+    }
+
+    const saved = localStorage.getItem(storageKey);
+    if (saved === 'dark' || saved === 'light') {
+      applyTheme(saved);
+    } else {
+      applyTheme(document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    }
+
+    btn.addEventListener('click', function () {
+      const next = document.body.classList.contains('dark-mode') ? 'light' : 'dark';
+      localStorage.setItem(storageKey, next);
+      applyTheme(next);
+    });
+  })();
+
+  (function () {
+    const payloadEl = document.getElementById('dashboard-data');
+    if (!payloadEl) return;
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    const labels = (payload.revenue_by_day && payload.revenue_by_day.labels) || [];
+    const values = (payload.revenue_by_day && payload.revenue_by_day.values) || [];
+
+    const ctxRevenue = document.getElementById('revenueChart');
+    if (ctxRevenue) {
+      new Chart(ctxRevenue, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Ingresos',
+            data: values,
+            backgroundColor: 'rgba(31, 122, 77, 0.35)',
+            borderColor: 'rgba(20, 90, 55, 1)',
+            borderWidth: 1,
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, ticks: { callback: v => '$' + v } }
+          }
+        }
+      });
+    }
+
+    const statusRows = payload.orders_by_status || [];
+    const statusLabels = statusRows.map(r => r.status);
+    const statusCounts = statusRows.map(r => r.count);
+    const statusColors = ['#145a37', '#1f7a4d', '#2b8c5c', '#4fa678', '#78be96', '#a7d5bc'];
+
+    const ctxStatus = document.getElementById('ordersStatusChart');
+    if (ctxStatus) {
+      new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            data: statusCounts,
+            backgroundColor: statusLabels.map((_, i) => statusColors[i % statusColors.length]),
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          cutout: '68%'
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

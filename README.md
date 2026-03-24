@@ -1,40 +1,153 @@
-# API Guayabal (`api_wini`)
+# Informe Tecnico - API Guayabal (`api_wini`)
 
-Backend REST con Django + Django REST Framework. Incluye autenticaci?n JWT, cat?logo de productos, carrito, pedidos, direcciones y seguimiento.
+Fecha del informe: 23 de marzo de 2026  
+Tipo de sistema: Backend REST para ecommerce y trazabilidad de chocolate  
+Framework principal: Django + Django REST Framework
 
-## Stack
+## 1. Resumen Ejecutivo
 
-- Python 3.12+
-- Django 6
-- Django REST Framework
-- SimpleJWT
-- PostgreSQL
-- Pillow
-- `django-cors-headers`
+`api_wini` es una API REST desarrollada en Django que soporta el flujo operativo de una aplicacion de comercio electronico. El sistema incluye autenticacion JWT, catalogo de productos, carrito, pedidos, direcciones, seguimiento logistica de envios, solicitudes de cambio de rol y trazabilidad por codigo QR para lotes de chocolate.
 
-## M?dulos principales
+El backend tambien incluye un panel administrativo personalizado (`/admin/`) con dashboard de metricas operativas y de negocio.
 
-- Autenticaci?n y usuarios (`/register/`, `/login/`, `/me/`, cambio de password)
-- Cat?logo (`/banners/`, `/categories/`, `/products/`)
-- Carrito (`/cart/`, `/cart/count/`)
-- Pedidos y tracking (`/orders/`, tracking de env?o, asignaci?n de repartidor)
-- Direcciones de entrega (`/addresses/`)
-- Solicitudes de rol (`/role-requests/`)
-- Geocoding y rutas (`/geo/*`)
+## 2. Objetivo del Sistema
 
-## Estructura del proyecto
+- Centralizar la gestion de usuarios, productos y pedidos.
+- Exponer endpoints para la app movil/web.
+- Permitir geolocalizacion, validacion de direcciones y estimacion de rutas.
+- Soportar trazabilidad de lotes desde QR para transparencia del producto.
+
+## 3. Alcance Funcional
+
+### 3.1 Modulos implementados
+
+- Autenticacion y perfil de usuario (`register`, `login`, `me`, cambio de password).
+- Catalogo comercial (banners, categorias y productos).
+- Carrito de compras (crear, actualizar, eliminar, conteo).
+- Pedidos y envios (creacion, seguimiento, asignacion de repartidor, ubicacion).
+- Direcciones de entrega por usuario.
+- Solicitudes de rol (`driver` y `provider`) con flujo de aprobacion.
+- Geoservicios (`autocomplete`, `geocode`, validacion de direccion, rutas).
+- Trazabilidad por QR de lotes de chocolate.
+- Dashboard administrativo con indicadores.
+
+### 3.2 Fuera de alcance actual
+
+- Motor de pagos integrado.
+- Pipeline CI/CD definido en repositorio.
+- Suite de pruebas extensa por modulo (actualmente solo chequeos basicos).
+
+## 4. Arquitectura Tecnica
+
+- Lenguaje: Python 3.12+
+- Framework web: Django 6
+- API: Django REST Framework
+- Auth: SimpleJWT (Bearer Token)
+- Base de datos principal: PostgreSQL
+- Base de datos para tests (opcional): SQLite en memoria
+- Librerias clave: `django-cors-headers`, `Pillow`
+- Integraciones de mapas: OpenStreetMap/OSRM o Google Maps Platform
+
+### 4.1 Estructura del proyecto
 
 ```text
 api_wini/
-  api_wini/   # settings, urls, wsgi, asgi
-  app/        # models, serializers, views, admin, permissions
-  media/      # archivos cargados (im?genes)
+  api_wini/                  # settings, urls, wsgi, asgi
+  app/                       # modelos, vistas, serializers, admin, permisos
+  app/templates/admin/       # dashboard administrativo
+  media/                     # archivos subidos (imagenes)
   manage.py
+  README.md
 ```
 
-## Instalaci?n local (Windows / PowerShell)
+## 5. Modelo de Dominio (Resumen)
 
-1. Crear y activar entorno virtual:
+Entidades principales:
+
+- Catalogo: `Category`, `Banner`, `Product`
+- Usuario y perfil: `UserProfile`
+- Compra: `Cart`, `Order`, `OrderItem`
+- Entrega: `DeliveryAddress`, `Shipment`, `ShipmentLocation`
+- Roles: `RoleChangeRequest`
+- Trazabilidad: `CocoaInfo`, `ChocolateLot`, `LotTraceEvent`
+
+## 6. Endpoints Principales
+
+Base URL local: `http://127.0.0.1:8000/`
+
+### 6.1 Publicos
+
+- `GET /`
+- `POST /register/`
+- `GET /register/`
+- `POST /login/`
+- `POST /token/refresh/`
+- `GET /banners/`
+- `GET /categories/`
+- `GET /products/`
+- `GET /products/<id>/`
+- `GET /trace/qr/<qr_code>/`
+
+### 6.2 Protegidos (Bearer Token)
+
+- `GET /me/`
+- `PATCH /me/`
+- `POST /me/change-password/`
+- `GET|POST|PATCH|DELETE /cart/`
+- `GET /cart/count/`
+- `GET|POST /orders/`
+- `GET /orders/<id>/`
+- `GET /orders/<id>/tracking/`
+- `POST /orders/<id>/tracking/assign-driver/`
+- `POST /orders/<id>/tracking/location/`
+- `GET|POST /addresses/`
+- `GET|PATCH|DELETE /addresses/<id>/`
+- `GET|POST /role-requests/`
+- `GET /geo/autocomplete/`
+- `GET /geo/geocode/`
+- `POST /geo/validate-address/`
+- `POST /geo/routes/estimate/`
+
+### 6.3 Administrativo
+
+- `GET /admin/` (dashboard personalizado)
+
+## 7. Flujo de Autenticacion JWT
+
+1. Registrar usuario en `POST /register/`.
+2. Iniciar sesion en `POST /login/`.
+3. Recibir `access` y `refresh`.
+4. Consumir endpoints privados con header:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+5. Renovar token en `POST /token/refresh/`.
+
+## 8. Configuracion y Variables de Entorno
+
+Archivo clave: `api_wini/settings.py`
+
+Variables usadas en geolocalizacion:
+
+- `GEO_PROVIDER` (`osm` o `google`)
+- `GOOGLE_MAPS_SERVER_API_KEY`
+- `GOOGLE_MAPS_LANGUAGE`
+- `GOOGLE_MAPS_REGION`
+- `GEOCODER_USER_AGENT`
+- `OSM_NOMINATIM_BASE_URL`
+- `OSM_ROUTER_BASE_URL`
+
+Notas actuales observadas en configuracion local:
+
+- `DEBUG=True`
+- `CORS_ALLOW_ALL_ORIGINS=True`
+- Credenciales de BD hardcodeadas en settings
+
+## 9. Ejecucion Local (Windows / PowerShell)
+
+1. Crear entorno virtual:
 
 ```powershell
 python -m venv venv
@@ -53,109 +166,31 @@ pip install django djangorestframework djangorestframework-simplejwt django-cors
 python manage.py migrate
 ```
 
-4. Levantar servidor:
+4. Ejecutar servidor:
 
 ```powershell
 python manage.py runserver
 ```
 
-## Configuraci?n
+## 10. Verificacion Tecnica
 
-Archivo principal: `api_wini/settings.py`
-
-- Base de datos por defecto: PostgreSQL (`DATABASES`)
-- JWT global en DRF:
-  - `DEFAULT_AUTHENTICATION_CLASSES = JWTAuthentication`
-  - `AUTH_HEADER_TYPES = (\"Bearer\",)`
-- Lifetimes:
-  - Access token: 60 minutos
-  - Refresh token: 1 d?a
-
-Variables de entorno usadas por geolocalizaci?n:
-
-- `GOOGLE_MAPS_SERVER_API_KEY`
-- `GOOGLE_MAPS_LANGUAGE`
-- `GOOGLE_MAPS_REGION`
-- `GEO_PROVIDER` (`osm` o `google`)
-- `GEOCODER_USER_AGENT`
-- `OSM_NOMINATIM_BASE_URL`
-- `OSM_ROUTER_BASE_URL`
-
-## Flujo de autenticaci?n JWT
-
-1. Registrar usuario: `POST /register/`
-2. Iniciar sesi?n: `POST /login/`
-3. Recibir `access` y `refresh`
-4. Consumir rutas protegidas con:
-
-```http
-Authorization: Bearer <access_token>
-```
-
-5. Renovar access token: `POST /token/refresh/`
-
-## Endpoints principales
-
-### Auth
-
-- `POST /register/` (crea usuario)
-- `GET /register/` (lista usuarios registrados)
-- `POST /login/`
-- `POST /token/refresh/`
-- `GET /me/`
-- `PATCH /me/`
-- `POST /me/change-password/`
-
-### P?blicos
-
-- `GET /banners/`
-- `GET /categories/`
-- `GET /products/`
-- `GET /products/<id>/`
-
-### Protegidos (Bearer token)
-
-- `GET|POST|PATCH|DELETE /cart/`
-- `GET /cart/count/`
-- `GET|POST /orders/`
-- `GET /orders/<id>/`
-- `GET /orders/<id>/tracking/`
-- `POST /orders/<id>/tracking/location/`
-- `POST /orders/<id>/tracking/assign-driver/`
-- `GET|POST /addresses/`
-- `GET|PATCH|DELETE /addresses/<id>/`
-- `GET|POST /role-requests/`
-- `GET /geo/autocomplete/`
-- `GET /geo/geocode/`
-- `POST /geo/validate-address/`
-- `POST /geo/routes/estimate/`
-
-## Ejemplo r?pido
-
-Login:
-
-```bash
-curl -X POST http://127.0.0.1:8000/login/ \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"usuario\",\"password\":\"12345678\"}"
-```
-
-Consultar perfil autenticado:
-
-```bash
-curl http://127.0.0.1:8000/me/ \
-  -H "Authorization: Bearer TU_ACCESS_TOKEN"
-```
-
-## Verificaci?n
+Chequeo ejecutado:
 
 ```powershell
 python manage.py check
 ```
 
-## Notas de seguridad (recomendado para producci?n)
+Resultado: `System check identified no issues (0 silenced).`
 
-- No dejar `DEBUG=True`.
-- No exponer `SECRET_KEY` en repositorio.
-- Restringir CORS a dominios confiables.
-- Mover credenciales de base de datos a variables de entorno.
+## 11. Riesgos y Recomendaciones
+
+- Mover `SECRET_KEY` y credenciales de DB a variables de entorno.
+- Desactivar `DEBUG` en produccion.
+- Restringir CORS por dominios permitidos.
+- Agregar `requirements.txt` o `pyproject.toml` para versionado de dependencias.
+- Incorporar pruebas automatizadas por modulo critico (auth, orders, tracking).
+- Definir pipeline CI/CD para validacion y despliegue.
+
+## 12. Estado General
+
+El sistema se encuentra operativo en entorno local, con modulos principales funcionales para ecommerce, logistica y trazabilidad. La base tecnica es adecuada para evolucionar a un entorno de produccion, condicionada a mejoras de seguridad, observabilidad y automatizacion.

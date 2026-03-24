@@ -1,4 +1,6 @@
-from django.contrib import admin  # Importa admin desde `django.contrib`.
+from django.contrib import admin  # Importa admin desde `django.contrib`.
+
+from .admin_site import dashboard_site  # Importa `dashboard_site` (AdminSite con dashboard).
 
 
 
@@ -78,7 +80,7 @@ from .models import (  # Importa ( desde `.models`.
 
 
 
-@admin.register(Category)  # Aplica el decorador `admin.register`.
+@admin.register(Category, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -146,7 +148,7 @@ class CategoryAdmin(admin.ModelAdmin):  # Define la clase `CategoryAdmin`.
 
 
 
-@admin.register(Banner)  # Aplica el decorador `admin.register`.
+@admin.register(Banner, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -218,7 +220,7 @@ class BannerAdmin(admin.ModelAdmin):  # Define la clase `BannerAdmin`.
 
 
 
-@admin.register(Product)  # Aplica el decorador `admin.register`.
+@admin.register(Product, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -350,7 +352,7 @@ class ProductAdmin(admin.ModelAdmin):  # Define la clase `ProductAdmin`.
 
 
 
-@admin.register(Cart)  # Aplica el decorador `admin.register`.
+@admin.register(Cart, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -374,7 +376,7 @@ class CartAdmin(admin.ModelAdmin):  # Define la clase `CartAdmin`.
 
 
 
-@admin.register(UserProfile)  # Aplica el decorador `admin.register`.
+@admin.register(UserProfile, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -442,7 +444,7 @@ class UserProfileAdmin(admin.ModelAdmin):  # Define la clase `UserProfileAdmin`.
 
 
 
-@admin.register(DeliveryAddress)  # Aplica el decorador `admin.register`.
+@admin.register(DeliveryAddress, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -470,7 +472,7 @@ class DeliveryAddressAdmin(admin.ModelAdmin):  # Define la clase `DeliveryAddres
 
 
 
-@admin.register(RoleChangeRequest)  # Aplica el decorador `admin.register`.
+@admin.register(RoleChangeRequest, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -530,7 +532,7 @@ class OrderItemInline(admin.TabularInline):  # Define la clase `OrderItemInline`
 
 
 
-@admin.register(Order)  # Aplica el decorador `admin.register`.
+@admin.register(Order, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -590,7 +592,7 @@ class OrderAdmin(admin.ModelAdmin):  # Define la clase `OrderAdmin`.
 
 
 
-@admin.register(OrderItem)  # Aplica el decorador `admin.register`.
+@admin.register(OrderItem, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -650,7 +652,7 @@ class ShipmentLocationInline(admin.TabularInline):  # Define la clase `ShipmentL
 
 
 
-@admin.register(Shipment)  # Aplica el decorador `admin.register`.
+@admin.register(Shipment, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -722,7 +724,7 @@ class ShipmentAdmin(admin.ModelAdmin):  # Define la clase `ShipmentAdmin`.
 
 
 
-@admin.register(ShipmentLocation)  # Aplica el decorador `admin.register`.
+@admin.register(ShipmentLocation, site=dashboard_site)  # Aplica el decorador `admin.register`.
 
 
 
@@ -946,11 +948,13 @@ class UserAdmin(BaseUserAdmin):  # Define la clase `UserAdmin`.
 
 
 
-admin.site.unregister(User)  # Ejecuta `admin.site.unregister`.
+if User in dashboard_site._registry:  # Evalua la condicion del `if`.
+    dashboard_site.unregister(User)  # Ejecuta `dashboard_site.unregister`.
 
 
 
-admin.site.register(User, UserAdmin)  # Ejecuta `admin.site.register`.
+dashboard_site.register(User, UserAdmin)  # Ejecuta `dashboard_site.register`.
+from . import admin_traceability  # Carga registros admin para lotes/cacao/trazabilidad.
 
 
 

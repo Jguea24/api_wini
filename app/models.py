@@ -1990,7 +1990,7 @@ def sync_user_groups_on_role_approval(sender, instance, **kwargs):  # Define la 
 
 
 
-        provider_group, _ = Group.objects.get_or_create(name='PROVIDER')  # Asigna a `provider_group` y `_` el resultado de `Group.objects.get_or_create`.
+        provider_group, _ = Group.objects.get_or_create(name='PROVIDER')  # Asigna a `provider_group` y `_` el resultado de `Group.objects.get_or_create`.
 
 
 
@@ -1998,7 +1998,9 @@ def sync_user_groups_on_role_approval(sender, instance, **kwargs):  # Define la 
 
 
 
-        user.groups.add(provider_group)  # Ejecuta `user.groups.add`.
+        user.groups.add(provider_group)  # Ejecuta `user.groups.add`.
+
+from .models_traceability import ChocolateLot, CocoaInfo, LotTraceEvent  # Expone modelos de trazabilidad en `app.models`.
 
 
 

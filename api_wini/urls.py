@@ -1,4 +1,4 @@
-from django.contrib import admin  # Importa admin desde `django.contrib`.
+from app.admin_site import dashboard_site  # Importa el admin site con dashboard.
 from django.conf import settings  # Importa settings desde `django.conf`.
 from django.conf.urls.static import static  # Importa static desde `django.conf.urls.static`.
 from django.urls import path  # Importa path desde `django.urls`.
@@ -30,6 +30,7 @@ from app.views import (  # Importa ( desde `app.views`.
     ProductListView,  # Referencia `ProductListView` en la estructura/expresion.
     CartView  # Referencia `CartView` en la estructura/expresion.
 )  # Cierra el bloque/estructura.
+from app.traceability_views import TraceabilityByQrView  # Importa vista de trazabilidad por QR.
 
 # 🔹 Vista raíz (opcional pero recomendada)
 def home(request):  # Define la funcion `home`.
@@ -43,7 +44,7 @@ urlpatterns = [  # Asigna un valor a `urlpatterns`.
     path('', home),  # Ejecuta `path`.
 
     # Admin
-    path('admin/', admin.site.urls),  # Ejecuta `path`.
+    path('admin/', dashboard_site.urls),  # Ejecuta `path`.
 
     # Autenticación
     path('register/', RegisterView.as_view()),  # Ejecuta `path`.
@@ -71,6 +72,7 @@ urlpatterns = [  # Asigna un valor a `urlpatterns`.
     path('geo/geocode/', GeoGeocodeView.as_view()),  # Ejecuta `path`.
     path('geo/validate-address/', GeoAddressValidationView.as_view()),  # Ejecuta `path`.
     path('geo/routes/estimate/', GeoRouteEstimateView.as_view()),  # Ejecuta `path`.
+    path('trace/qr/<str:qr_code>/', TraceabilityByQrView.as_view()),  # Ejecuta `path`.
 ]  # Cierra el bloque/estructura.
 
 if settings.DEBUG:  # Evalua la condicion del `if`.

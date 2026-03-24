@@ -1,12 +1,21 @@
 from django.contrib.auth.models import User  # Importa User desde `django.contrib.auth.models`.
 from django.test import TestCase  # Importa TestCase desde `django.test`.
 from decimal import Decimal  # Importa Decimal desde `decimal`.
+from datetime import date, timedelta  # Importa utilidades de fecha desde `datetime`.
 
 from rest_framework.test import APIClient  # Importa APIClient desde `rest_framework.test`.
 
 from django.contrib.auth.models import Group  # Importa Group desde `django.contrib.auth.models`.
 
-from app.models import Order, RoleChangeRequest, Shipment  # Importa Order, RoleChangeRequest, Shipment desde `app.models`.
+from app.models import (  # Importa modelos desde `app.models`.
+    ChocolateLot,  # Referencia `ChocolateLot` en la estructura/expresion.
+    CocoaInfo,  # Referencia `CocoaInfo` en la estructura/expresion.
+    LotTraceEvent,  # Referencia `LotTraceEvent` en la estructura/expresion.
+    Order,  # Referencia `Order` en la estructura/expresion.
+    Product,  # Referencia `Product` en la estructura/expresion.
+    RoleChangeRequest,  # Referencia `RoleChangeRequest` en la estructura/expresion.
+    Shipment,  # Referencia `Shipment` en la estructura/expresion.
+)  # Cierra el bloque/estructura.
 from app.serializers import RegisterSerializer, ShipmentAssignDriverSerializer  # Importa RegisterSerializer, ShipmentAssignDriverSerializer desde `app.serializers`.
 
 
@@ -218,3 +227,76 @@ class OrderAssignDriverPermissionTests(TestCase):  # Define la clase `OrderAssig
             format='json',  # Asigna un valor a `format`.
         )  # Cierra el bloque/estructura.
         self.assertEqual(resp.status_code, 403, resp.data)  # Ejecuta `self.assertEqual`.
+
+
+class TraceabilityByQrViewTests(TestCase):  # Define la clase `TraceabilityByQrViewTests`.
+    def setUp(self):  # Define la funcion `setUp`.
+        self.client = APIClient()  # Asigna a `self.client` el resultado de `APIClient`.
+        self.product = Product.objects.create(  # Asigna a `self.product` el resultado de `Product.objects.create`.
+            name='Chocolate 70%',  # Asigna un valor a `name`.
+            price=Decimal('4.50'),  # Asigna a `price` el resultado de `Decimal`.
+            stock=12,  # Asigna un valor a `stock`.
+        )  # Cierra el bloque/estructura.
+        CocoaInfo.objects.create(  # Ejecuta `CocoaInfo.objects.create`.
+            product=self.product,  # Asigna un valor a `product`.
+            cacao_variety='Nacional',  # Asigna un valor a `cacao_variety`.
+            origin_country='Ecuador',  # Asigna un valor a `origin_country`.
+            origin_region='Los Rios',  # Asigna un valor a `origin_region`.
+            farm_name='Finca El Cacao',  # Asigna un valor a `farm_name`.
+            fermentation_hours=72,  # Asigna un valor a `fermentation_hours`.
+            drying_days=7,  # Asigna un valor a `drying_days`.
+            roasting_profile='Ligero',  # Asigna un valor a `roasting_profile`.
+            story='Cacao de pequeños productores.',  # Asigna un valor a `story`.
+        )  # Cierra el bloque/estructura.
+        self.lot = ChocolateLot.objects.create(  # Asigna a `self.lot` el resultado de `ChocolateLot.objects.create`.
+            product=self.product,  # Asigna un valor a `product`.
+            lot_code='LOT-CHOC-001',  # Asigna un valor a `lot_code`.
+            qr_code='QR-CHOC-001',  # Asigna un valor a `qr_code`.
+            production_date=date.today() - timedelta(days=5),  # Asigna un valor a `production_date`.
+            expiration_date=date.today() + timedelta(days=360),  # Asigna un valor a `expiration_date`.
+            cacao_percentage=Decimal('70.00'),  # Asigna a `cacao_percentage` el resultado de `Decimal`.
+            bean_origin='Quevedo',  # Asigna un valor a `bean_origin`.
+            notes='Lote premium',  # Asigna un valor a `notes`.
+            is_active=True,  # Asigna un valor a `is_active`.
+        )  # Cierra el bloque/estructura.
+
+    def test_qr_traceability_returns_full_payload(self):  # Define la funcion `test_qr_traceability_returns_full_payload`.
+        LotTraceEvent.objects.create(  # Ejecuta `LotTraceEvent.objects.create`.
+            lot=self.lot,  # Asigna un valor a `lot`.
+            step='Fermentacion',  # Asigna un valor a `step`.
+            status='completed',  # Asigna un valor a `status`.
+            location='Los Rios',  # Asigna un valor a `location`.
+            details='72 horas',  # Asigna un valor a `details`.
+        )  # Cierra el bloque/estructura.
+        LotTraceEvent.objects.create(  # Ejecuta `LotTraceEvent.objects.create`.
+            lot=self.lot,  # Asigna un valor a `lot`.
+            step='Tostado',  # Asigna un valor a `step`.
+            status='completed',  # Asigna un valor a `status`.
+            location='Planta Quito',  # Asigna un valor a `location`.
+            details='Perfil ligero',  # Asigna un valor a `details`.
+        )  # Cierra el bloque/estructura.
+
+        resp = self.client.get('/trace/qr/QR-CHOC-001/')  # Asigna a `resp` el resultado de `self.client.get`.
+        self.assertEqual(resp.status_code, 200, resp.data)  # Ejecuta `self.assertEqual`.
+        self.assertEqual(resp.data['qr_code'], 'QR-CHOC-001')  # Ejecuta `self.assertEqual`.
+        self.assertEqual(resp.data['lot']['lot_code'], 'LOT-CHOC-001')  # Ejecuta `self.assertEqual`.
+        self.assertEqual(resp.data['product']['name'], 'Chocolate 70%')  # Ejecuta `self.assertEqual`.
+        self.assertEqual(resp.data['cocoa_info']['origin_country'], 'Ecuador')  # Ejecuta `self.assertEqual`.
+        self.assertEqual(len(resp.data['traceability']), 2)  # Ejecuta `self.assertEqual`.
+
+    def test_qr_traceability_fallbacks_to_lot_code(self):  # Define la funcion `test_qr_traceability_fallbacks_to_lot_code`.
+        resp = self.client.get('/trace/qr/LOT-CHOC-001/')  # Asigna a `resp` el resultado de `self.client.get`.
+        self.assertEqual(resp.status_code, 200, resp.data)  # Ejecuta `self.assertEqual`.
+        self.assertEqual(resp.data['lot']['lot_code'], 'LOT-CHOC-001')  # Ejecuta `self.assertEqual`.
+
+    def test_qr_traceability_returns_404_when_not_found(self):  # Define la funcion `test_qr_traceability_returns_404_when_not_found`.
+        resp = self.client.get('/trace/qr/NO-EXISTE/')  # Asigna a `resp` el resultado de `self.client.get`.
+        self.assertEqual(resp.status_code, 404, resp.data)  # Ejecuta `self.assertEqual`.
+        self.assertIn('error', resp.data)  # Ejecuta `self.assertIn`.
+
+    def test_qr_traceability_returns_404_for_inactive_lot(self):  # Define la funcion `test_qr_traceability_returns_404_for_inactive_lot`.
+        self.lot.is_active = False  # Asigna un valor a `self.lot.is_active`.
+        self.lot.save(update_fields=['is_active'])  # Ejecuta `self.lot.save`.
+
+        resp = self.client.get('/trace/qr/QR-CHOC-001/')  # Asigna a `resp` el resultado de `self.client.get`.
+        self.assertEqual(resp.status_code, 404, resp.data)  # Ejecuta `self.assertEqual`.
