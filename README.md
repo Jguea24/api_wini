@@ -48,7 +48,20 @@ El backend tambien incluye un panel administrativo personalizado (`/admin/`) con
 - Librerias clave: `django-cors-headers`, `Pillow`
 - Integraciones de mapas: OpenStreetMap/OSRM o Google Maps Platform
 
-### 4.1 Estructura del proyecto
+### 4.1 Versiones usadas en el entorno actual
+
+Versiones verificadas en el entorno local (23 de marzo de 2026):
+
+- Python: `3.12.10`
+- Django: `6.0.1`
+- Django REST Framework: `3.16.1`
+- SimpleJWT (`djangorestframework_simplejwt`): `5.5.1`
+- `django-cors-headers`: `4.9.0`
+- Pillow: `12.1.1`
+- `psycopg2-binary`: `2.9.11`
+- Motor de base de datos (instancia local): PostgreSQL `18.1`
+
+### 4.2 Estructura del proyecto
 
 ```text
 api_wini/
@@ -128,6 +141,24 @@ Authorization: Bearer <access_token>
 ## 8. Configuracion y Variables de Entorno
 
 Archivo clave: `api_wini/settings.py`
+
+### 8.1 Base de datos y conexion actual
+
+Configuracion activa observada en `settings.py`:
+
+- Engine: `django.db.backends.postgresql`
+- Database: `app_wini`
+- User: `guayabal_user`
+- Host: `localhost`
+- Port: `5432`
+- Driver Python: `psycopg2-binary 2.9.11`
+- Version del servidor validada: PostgreSQL `18.1`
+
+Ejemplo equivalente de cadena de conexion:
+
+```text
+postgresql://guayabal_user:admin1234@localhost:5432/app_wini
+```
 
 Variables usadas en geolocalizacion:
 
